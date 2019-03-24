@@ -144,7 +144,8 @@ final class XRayExporterHandler extends SpanExporter.Handler {
   */
 
   private TraceSegment generateSegment(SpanData spanData) {
-    return new TraceSegment(serviceName, spanData);
+    // TODO: AWS X-Ray does not have service value?
+    return new TraceSegment(spanData);
   }
 
   @Override

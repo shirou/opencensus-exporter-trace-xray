@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -62,6 +63,10 @@ public class TraceSegment {
   @JsonProperty("trace_id")
   public String traceId;
 
+  @JsonProperty("parent_id")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public String parentId;
+
   @JsonProperty("end_time")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Float endTime;
@@ -73,10 +78,6 @@ public class TraceSegment {
   @JsonProperty("type")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public String type;
-
-  @JsonProperty("parent_id")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public String parentId;
 
   @JsonProperty("namespace")
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -90,18 +91,41 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Boolean error;
 
-  public TraceSegment(String name, SpanData sd) {
+  @JsonProperty("throttle")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Boolean throttle;
+
+  @JsonProperty("cause")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Cause cause;
+
+  public class Cause {
+    @JsonProperty("exceptions")
+    public List<Exceptions> exceptions;
+
+    public class Exceptions {
+      @JsonProperty("id")
+      public String id;
+
+      @JsonProperty("message")
+      public String message;
+    }
+  }
+
+  public TraceSegment(SpanData sd) {
     SpanContext sc = sd.getContext();
-    if (name == null || name.equals("")) {
-      name = fixSegmentName(sd.getName());
-    }
-    this.name = name;
+    this.name = fixSegmentName(sd.getName());
 
-    if (sd.getHasRemoteParent() != null) {
-      this.nameSpace = "remote";
+    // IDs
+    this.id = convertToAmazonSpanID(sc.getSpanId());
+    this.traceId = convertToAmazonTraceID(sc.getTraceId());
+    SpanId parentId = sd.getParentSpanId();
+    if (parentId != null) {
+      this.parentId = convertToAmazonSpanID(parentId);
     }
+
+    // Time
     this.startTime = toEpochSeconds(sd.getStartTimestamp());
-
     Timestamp endTime = sd.getEndTimestamp();
     if (endTime == null) {
       this.inProgress = true;
@@ -109,11 +133,12 @@ public class TraceSegment {
       this.endTime = toEpochSeconds(endTime);
     }
 
+    if (sd.getHasRemoteParent() != null) {
+      this.nameSpace = "remote";
+    }
+
     makeCause(sd.getStatus());
     this.makeAnnotations(sd.getAnnotations());
-
-    this.id = convertToAmazonSpanID(sc.getSpanId());
-    this.traceId = convertToAmazonTraceID(sc.getTraceId());
   }
 
   /*
@@ -164,17 +189,22 @@ public class TraceSegment {
     return sb.toString();
   }
 
-  private Map<String, Object> makeAnnotations(SpanData.TimedEvents<Annotation> annotations) {
-    // TODO
-    return null;
-  }
-
   private void makeCause(Status status) {
-    // TODO
+    // TODO: description is not finished.
     if (status == null || status.isOk()) {
       return;
     }
+
+    if (status.equals(Status.RESOURCE_EXHAUSTED)) {
+      this.throttle = true;
+      return;
+    }
     this.error = true;
+  }
+
+  private Map<String, Object> makeAnnotations(SpanData.TimedEvents<Annotation> annotations) {
+    // TODO
+    return null;
   }
 
   /*
