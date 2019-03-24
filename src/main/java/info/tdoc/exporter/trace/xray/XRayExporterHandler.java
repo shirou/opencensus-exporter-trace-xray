@@ -35,10 +35,6 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/*>>>
-import org.checkerframework.checker.nullness.qual.Nullable;
-*/
-
 final class XRayExporterHandler extends SpanExporter.Handler {
   private static final Tracer tracer = Tracing.getTracer();
   private static final Sampler probabilitySampler = Samplers.probabilitySampler(0.0001);
@@ -58,94 +54,8 @@ final class XRayExporterHandler extends SpanExporter.Handler {
     this.useDaemon = false;
   }
 
-  /*
-  @SuppressWarnings("deprecation")
-  static Span generateSpan(SpanData spanData, Endpoint localEndpoint) {
-    SpanContext context = spanData.getContext();
-    long startTimestamp = toEpochMicros(spanData.getStartTimestamp());
-
-    // TODO(sebright): Fix the Checker Framework warning.
-    @SuppressWarnings("nullness")
-    long endTimestamp = toEpochMicros(spanData.getEndTimestamp());
-
-    // TODO(bdrutu): Fix the Checker Framework warning.
-    @SuppressWarnings("nullness")
-    Span.Builder spanBuilder =
-        Span.newBuilder()
-            .traceId(context.getTraceId().toLowerBase16())
-            .id(context.getSpanId().toLowerBase16())
-            .kind(toSpanKind(spanData))
-            .name(spanData.getName())
-            .timestamp(toEpochMicros(spanData.getStartTimestamp()))
-            .duration(endTimestamp - startTimestamp)
-            .localEndpoint(localEndpoint);
-
-    if (spanData.getParentSpanId() != null && spanData.getParentSpanId().isValid()) {
-      spanBuilder.parentId(spanData.getParentSpanId().toLowerBase16());
-    }
-
-    for (Map.Entry<String, AttributeValue> label :
-        spanData.getAttributes().getAttributeMap().entrySet()) {
-      spanBuilder.putTag(label.getKey(), attributeValueToString(label.getValue()));
-    }
-    Status status = spanData.getStatus();
-    if (status != null) {
-      spanBuilder.putTag(STATUS_CODE, status.getCanonicalCode().toString());
-      if (status.getDescription() != null) {
-        spanBuilder.putTag(STATUS_DESCRIPTION, status.getDescription());
-      }
-    }
-
-    for (TimedEvent<Annotation> annotation : spanData.getAnnotations().getEvents()) {
-      spanBuilder.addAnnotation(
-          toEpochMicros(annotation.getTimestamp()), annotation.getEvent().getDescription());
-    }
-
-    for (TimedEvent<io.opencensus.trace.MessageEvent> messageEvent :
-        spanData.getMessageEvents().getEvents()) {
-      spanBuilder.addAnnotation(
-          toEpochMicros(messageEvent.getTimestamp()), messageEvent.getEvent().getType().name());
-    }
-
-    return spanBuilder.build();
-  }
-
-  @javax.annotation.Nullable
-  private static Span.Kind toSpanKind(SpanData spanData) {
-    // This is a hack because the Span API did not have SpanKind.
-    if (spanData.getKind() == Kind.SERVER
-        || (spanData.getKind() == null && Boolean.TRUE.equals(spanData.getHasRemoteParent()))) {
-      return Span.Kind.SERVER;
-    }
-
-    // This is a hack because the Span API did not have SpanKind.
-    if (spanData.getKind() == Kind.CLIENT || spanData.getName().startsWith("Sent.")) {
-      return Span.Kind.CLIENT;
-    }
-
-    return null;
-  }
-
-  // The return type needs to be nullable when this function is used as an argument to 'match' in
-  // attributeValueToString, because 'match' doesn't allow covariant return types.
-  private static final Function<Object, @Nullable String> returnToString =
-      Functions.returnToString();
-
-  // TODO: Fix the Checker Framework warning.
-  @SuppressWarnings("nullness")
-  private static String attributeValueToString(AttributeValue attributeValue) {
-    return attributeValue.match(
-        returnToString,
-        returnToString,
-        returnToString,
-        returnToString,
-        Functions.<String>returnConstant(""));
-  }
-  */
-
-  private TraceSegment generateSegment(SpanData spanData) {
-    // TODO: AWS X-Ray does not have service value?
-    return new TraceSegment(spanData);
+  private TraceSegment generateSegment(String name, SpanData spanData) {
+    return new TraceSegment(name, spanData);
   }
 
   @Override
@@ -155,7 +65,7 @@ final class XRayExporterHandler extends SpanExporter.Handler {
     try {
       List<String> encodedSpans = new ArrayList<String>(spanDataList.size());
       for (SpanData spanData : spanDataList) {
-        TraceSegment tr = generateSegment(spanData);
+        TraceSegment tr = generateSegment(this.serviceName, spanData);
         String s = mapper.writeValueAsString(tr);
         if (useDaemon == true) {
           s = "{\"format\": \"json\", \"version\": 1}\n" + s;

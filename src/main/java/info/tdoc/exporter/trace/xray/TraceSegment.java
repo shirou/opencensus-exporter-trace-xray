@@ -20,8 +20,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.opencensus.common.Function;
+import io.opencensus.common.Functions;
 import io.opencensus.common.Timestamp;
-import io.opencensus.trace.Annotation;
+import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.SpanContext;
 import io.opencensus.trace.SpanId;
 import io.opencensus.trace.Status;
@@ -31,7 +33,9 @@ import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,7 +62,7 @@ public class TraceSegment {
   public String id;
 
   @JsonProperty("start_time")
-  public Float startTime;
+  public double startTime;
 
   @JsonProperty("trace_id")
   public String traceId;
@@ -69,7 +73,7 @@ public class TraceSegment {
 
   @JsonProperty("end_time")
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public Float endTime;
+  public double endTime;
 
   @JsonProperty("in_progress")
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -83,10 +87,6 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public String nameSpace;
 
-  @JsonProperty("annotations")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public String annotations;
-
   @JsonProperty("error")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Boolean error;
@@ -95,9 +95,26 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Boolean throttle;
 
+  @JsonProperty("user")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public String user;
+
+  @JsonProperty("annotations")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Map<String, Object> annotations;
+
   @JsonProperty("cause")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Cause cause;
+
+  @JsonProperty("origin")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public String origin;
+
+  @JsonProperty("subsegments")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public List<TraceSegment> subsegments;
+
 
   public class Cause {
     @JsonProperty("exceptions")
@@ -112,15 +129,19 @@ public class TraceSegment {
     }
   }
 
-  public TraceSegment(SpanData sd) {
+  public TraceSegment(String name, SpanData sd) {
     SpanContext sc = sd.getContext();
-    this.name = fixSegmentName(sd.getName());
+    if (name == null || name.equals("")) {
+      this.name = fixSegmentName(sd.getName());
+    } else {
+      this.name = name;
+    }
 
     // IDs
     this.id = convertToAmazonSpanID(sc.getSpanId());
     this.traceId = convertToAmazonTraceID(sc.getTraceId());
     SpanId parentId = sd.getParentSpanId();
-    if (parentId != null) {
+    if (parentId != null && parentId.isValid()) {
       this.parentId = convertToAmazonSpanID(parentId);
     }
 
@@ -138,7 +159,7 @@ public class TraceSegment {
     }
 
     makeCause(sd.getStatus());
-    this.makeAnnotations(sd.getAnnotations());
+    this.annotations = this.makeAnnotations(sd.getAttributes());
   }
 
   /*
@@ -202,9 +223,17 @@ public class TraceSegment {
     this.error = true;
   }
 
-  private Map<String, Object> makeAnnotations(SpanData.TimedEvents<Annotation> annotations) {
-    // TODO
-    return null;
+  private Map<String, Object> makeAnnotations(SpanData.Attributes attrib) {
+    if (attrib.getAttributeMap().entrySet().size() == 0) {
+      return null;
+    }
+
+    Map<String, Object> ret = new HashMap<String, Object>();
+    for (Map.Entry<String, AttributeValue> label : attrib.getAttributeMap().entrySet()) {
+      ret.put(label.getKey(), attributeValueToObject(label.getValue()));
+    }
+
+    return ret;
   }
 
   /*
@@ -227,7 +256,46 @@ public class TraceSegment {
     return name;
   }
 
-  private static float toEpochSeconds(Timestamp timestamp) {
-    return timestamp.getSeconds() + NANOSECONDS.toMillis(timestamp.getNanos());
+  private static double toEpochSeconds(Timestamp timestamp) {
+    return timestamp.getSeconds() + NANOSECONDS.toMillis(timestamp.getNanos()) / 1000.0;
   }
+
+  private static Object attributeValueToObject(AttributeValue attributeValue) {
+    return attributeValue.match(
+        stringAttributeValueFunction,
+        booleanAttributeValueFunction,
+        longAttributeValueFunction,
+        doubleAttributeValueFunction,
+        Functions.returnNull());
+  }
+
+  // Constant functions for AttributeValue.
+  private static final Function<? super String, Object> stringAttributeValueFunction =
+      new Function<String, Object>() {
+        @Override
+        public Object apply(String value) {
+          return value;
+        }
+      };
+  private static final Function<? super Boolean, Object> booleanAttributeValueFunction =
+      new Function<Boolean, Object>() {
+        @Override
+        public Object apply(Boolean value) {
+          return value;
+        }
+      };
+  private static final Function<? super Long, Object> longAttributeValueFunction =
+      new Function<Long, Object>() {
+        @Override
+        public Object apply(Long value) {
+          return value;
+        }
+      };
+  private static final Function<? super Double, Object> doubleAttributeValueFunction =
+      new Function<Double, Object>() {
+        @Override
+        public Object apply(Double value) {
+          return value;
+        }
+      };
 }

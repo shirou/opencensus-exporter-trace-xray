@@ -10,7 +10,7 @@ public class Main {
   private static Tracer tracer = Tracing.getTracer();
 
   public static void main(String... args) {
-    XRayTraceExporter.createAndRegister("hogeghoe");
+    XRayTraceExporter.createAndRegister("sampleApp");
 
     // For demo purposes, we'll always sample
     TraceConfig traceConfig = Tracing.getTraceConfig();
@@ -18,9 +18,15 @@ public class Main {
         traceConfig.getActiveTraceParams().toBuilder().setSampler(Samplers.alwaysSample()).build());
 
     // Do some work
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 2; i++) {
       String name = String.format("sample-%d", i);
       Scope ss = tracer.spanBuilder(name).startScopedSpan();
+
+      try (Scope scope = tracer.spanBuilder("INNER").startScopedSpan()) {
+        tracer.getCurrentSpan().addAnnotation("inner " + name);
+      }
+
+
       tracer.getCurrentSpan().addAnnotation("This annotation is for " + name);
       sleep(200); // Sleep for 200 milliseconds
       ss.close();

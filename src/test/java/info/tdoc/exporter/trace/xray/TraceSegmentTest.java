@@ -74,7 +74,7 @@ public class TraceSegmentTest {
             Status.OK,
             Timestamp.fromMillis(endTime));
 
-    TraceSegment tr = new TraceSegment(serviceName, sd);
+    TraceSegment tr = new TraceSegment(sd);
     assertEquals("0102030405060708", tr.id);
 
     ObjectMapper mapper = new ObjectMapper();
@@ -83,70 +83,11 @@ public class TraceSegmentTest {
       String s = mapper.writeValueAsString(tr);
       assertTrue(s.contains("05060708090a0b0c0d0e0f10")); // trace_id
       assertTrue(s.contains("0102030405060708")); // id
-      assertTrue(s.contains(":1.51962982E9")); // time
+      assertTrue(s.contains(":1.519629870001E9,")); // time
     }catch (Exception e){
       fail(e);
     }
-
   }
-
-  /*
-    handler.export(singletonList(spanData));
-
-    verify(mockSender).send(eq(process), captor.capture());
-    List<Span> spans = captor.getValue();
-
-    assertThat(spans.size()).isEqualTo(1);
-    Span span = spans.get(0);
-
-    assertThat(span.operationName).isEqualTo("test");
-    assertThat(span.spanId).isEqualTo(256L);
-    assertThat(span.traceIdHigh).isEqualTo(-72057594037927936L);
-    assertThat(span.traceIdLow).isEqualTo(1L);
-    assertThat(span.parentSpanId).isEqualTo(Long.MAX_VALUE);
-    assertThat(span.flags).isEqualTo(1);
-    assertThat(span.startTime).isEqualTo(MILLISECONDS.toMicros(startTime));
-    assertThat(span.duration).isEqualTo(MILLISECONDS.toMicros(endTime - startTime));
-
-    assertThat(span.tags.size()).isEqualTo(4);
-    assertThat(span.tags)
-        .containsExactly(
-            new Tag("BOOL", TagType.BOOL).setVBool(false),
-            new Tag("LONG", TagType.LONG).setVLong(Long.MAX_VALUE),
-            new Tag("span.kind", TagType.STRING).setVStr("server"),
-            new Tag("STRING", TagType.STRING)
-                .setVStr(
-                    "Judge of a man by his questions rather than by his answers. -- Voltaire"));
-
-    assertThat(span.logs.size()).isEqualTo(2);
-    Log log = span.logs.get(0);
-    assertThat(log.timestamp).isEqualTo(1519629872987654L);
-    assertThat(log.fields.size()).isEqualTo(4);
-    assertThat(log.fields)
-        .containsExactly(
-            new Tag("message", TagType.STRING).setVStr("annotation #1"),
-            new Tag("bool", TagType.BOOL).setVBool(true),
-            new Tag("long", TagType.LONG).setVLong(1337L),
-            new Tag("string", TagType.STRING)
-                .setVStr("Kind words do not cost much. Yet they accomplish much. -- Pascal"));
-    log = span.logs.get(1);
-    assertThat(log.timestamp).isEqualTo(1519629871123456L);
-    assertThat(log.fields.size()).isEqualTo(4);
-    assertThat(log.fields)
-        .containsExactly(
-            new Tag("message", TagType.STRING).setVStr("sent message"),
-            new Tag("id", TagType.LONG).setVLong(42L),
-            new Tag("compressed_size", TagType.LONG).setVLong(69),
-            new Tag("uncompressed_size", TagType.LONG).setVLong(96));
-
-    assertThat(span.references.size()).isEqualTo(1);
-    SpanRef reference = span.references.get(0);
-    assertThat(reference.traceIdHigh).isEqualTo(-1L);
-    assertThat(reference.traceIdLow).isEqualTo(-256L);
-    assertThat(reference.spanId).isEqualTo(512L);
-    assertThat(reference.refType).isEqualTo(SpanRefType.CHILD_OF);
-  }
-  */
 
   private static SpanContext sampleSpanContext() {
     return SpanContext.create(

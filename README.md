@@ -36,6 +36,8 @@ dependencies {
 This will export traces to the X-Ray thrift format to the X-Ray instance started previously:
 
 ```java
+import info.tdoc.exporter.trace.xray.XRayTraceExporter;
+
 public class MyMainClass {
   public static void main(String[] args) throws Exception {
     XRayTraceExporter.createAndRegister("my-service");
@@ -47,3 +49,26 @@ public class MyMainClass {
 #### Java Versions
 
 Java 8 or above is required for using this exporter.
+
+## conversion
+
+Src opensensus span data to X-Ray data.
+
+- OpenCensus Attribute -> X-Ray annocations
+- Status -> error, exceptions
+
+## TODO
+
+- [ ] Report errors / exceptions
+- [ ] Support http
+- [ ] Subsegments
+- [ ] Service (version etc)
+
+
+## reference
+
+- Golang AWS X-Ray exporter https://github.com/census-ecosystem/opencensus-go-exporter-aws
+
+## LICENSE
+
+Apache License
