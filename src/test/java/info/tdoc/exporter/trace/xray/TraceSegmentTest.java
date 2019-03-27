@@ -74,7 +74,7 @@ public class TraceSegmentTest {
             Status.OK,
             Timestamp.fromMillis(endTime));
 
-    TraceSegment tr = new TraceSegment(sd);
+    TraceSegment tr = new TraceSegment(serviceName, sd);
     assertEquals("0102030405060708", tr.id);
 
     ObjectMapper mapper = new ObjectMapper();

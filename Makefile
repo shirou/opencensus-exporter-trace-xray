@@ -1,3 +1,5 @@
+.PHONY: build upload
+
 build:
 	./gradlew build
 

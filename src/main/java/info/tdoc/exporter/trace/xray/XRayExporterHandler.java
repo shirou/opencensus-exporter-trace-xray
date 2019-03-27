@@ -73,6 +73,7 @@ final class XRayExporterHandler extends SpanExporter.Handler {
         encodedSpans.add(s);
       }
       try {
+        logger.log(Level.FINE, String.join("\n", encodedSpans));
         PutTraceSegmentsRequest req =
             new PutTraceSegmentsRequest().withTraceSegmentDocuments(encodedSpans);
         PutTraceSegmentsResult res = client.putTraceSegments(req);
@@ -83,6 +84,7 @@ final class XRayExporterHandler extends SpanExporter.Handler {
               "UnprocessedTraceSegments exist: count={}",
               res.getUnprocessedTraceSegments().size());
         }
+
       } catch (RuntimeException e) {
         tracer
             .getCurrentSpan()
