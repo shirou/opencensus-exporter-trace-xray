@@ -26,7 +26,6 @@ public class Main {
         tracer.getCurrentSpan().addAnnotation("inner " + name);
       }
 
-
       tracer.getCurrentSpan().addAnnotation("This annotation is for " + name);
       sleep(200); // Sleep for 200 milliseconds
       ss.close();

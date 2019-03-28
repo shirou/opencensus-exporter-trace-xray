@@ -84,7 +84,6 @@ final class XRayExporterHandler extends SpanExporter.Handler {
               "UnprocessedTraceSegments exist: count={}",
               res.getUnprocessedTraceSegments().size());
         }
-
       } catch (RuntimeException e) {
         tracer
             .getCurrentSpan()

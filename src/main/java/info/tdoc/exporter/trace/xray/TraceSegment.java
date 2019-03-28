@@ -32,11 +32,12 @@ import io.opencensus.trace.export.SpanData;
 import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -91,6 +92,10 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Boolean error;
 
+  @JsonProperty("fault")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Boolean fault;
+
   @JsonProperty("throttle")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Boolean throttle;
@@ -115,12 +120,16 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<TraceSegment> subsegments;
 
-
-  public class Cause {
+  public static class Cause {
     @JsonProperty("exceptions")
     public List<Exceptions> exceptions;
 
-    public class Exceptions {
+    public Cause(Exceptions exp) {
+      this.exceptions = new ArrayList<Exceptions>();
+      this.exceptions.add(exp);
+    }
+
+    public static class Exceptions {
       @JsonProperty("id")
       public String id;
 
@@ -159,7 +168,7 @@ public class TraceSegment {
     }
 
     makeCause(sd.getStatus());
-    this.annotations = this.makeAnnotations(sd.getAttributes());
+    this.annotations = this.makeAnnotations(sd.getName(), sd.getAttributes());
   }
 
   /*
@@ -216,19 +225,32 @@ public class TraceSegment {
       return;
     }
 
+    String desc = status.getDescription();
+    if (desc != null && desc.equals("") != true) {
+      Cause.Exceptions exp = new Cause.Exceptions();
+      Random rnd = new Random();
+      exp.id =
+          String.format("%04x", rnd.nextInt(0x10000)) + String.format("%04x", rnd.nextInt(0x10000));
+      exp.message = desc;
+      this.cause = new Cause(exp);
+    }
     if (status.equals(Status.RESOURCE_EXHAUSTED)) {
       this.throttle = true;
-      return;
+    } else if (isError(status) == true) {
+      this.error = true;
+    } else {
+      this.fault = true;
     }
-    this.error = true;
   }
 
-  private Map<String, Object> makeAnnotations(SpanData.Attributes attrib) {
+  private Map<String, Object> makeAnnotations(String name, SpanData.Attributes attrib) {
+    Map<String, Object> ret = new HashMap<String, Object>();
+    ret.put("name", name); // allways put span's name to attribute.
+
     if (attrib.getAttributeMap().entrySet().size() == 0) {
-      return null;
+      return ret;
     }
 
-    Map<String, Object> ret = new HashMap<String, Object>();
     for (Map.Entry<String, AttributeValue> label : attrib.getAttributeMap().entrySet()) {
       ret.put(label.getKey(), attributeValueToObject(label.getValue()));
     }
@@ -298,4 +320,34 @@ public class TraceSegment {
           return value;
         }
       };
+
+  /*
+   * if 400 <= code < 500, return true
+   */
+  private static final Boolean isError(Status status) {
+    switch (status.getCanonicalCode()) {
+      case ABORTED: // 409 Conflict
+      case ALREADY_EXISTS: // 409 Conflict
+      case CANCELLED: // 499 Client Closed Request
+      case FAILED_PRECONDITION: // 400 Bad Request
+      case INVALID_ARGUMENT: // 400 Bad Request
+      case NOT_FOUND: // 404 Not Found
+      case OUT_OF_RANGE: // 400 Bad Request
+      case PERMISSION_DENIED: // 403 Forbidden
+      case RESOURCE_EXHAUSTED: // 429 Too Many Requests
+      case UNAUTHENTICATED: // 401 Unauthorized
+        return true;
+      case OK:
+        return false;
+      case DATA_LOSS: // 500 Internal Server Error
+      case DEADLINE_EXCEEDED: // 504 Gateway Timeout
+      case INTERNAL: // 500 Internal Server Error
+      case UNAVAILABLE: // 503 Service Unavailable
+      case UNIMPLEMENTED: // 501 Not Implemented
+      case UNKNOWN: //  500 Internal Server Error
+        return false;
+      default:
+        return false;
+    }
+  }
 }
