@@ -120,6 +120,9 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<TraceSegment> subsegments;
 
+
+  private final static Random rnd = new Random();
+
   public static class Cause {
     @JsonProperty("exceptions")
     public List<Exceptions> exceptions;
@@ -152,6 +155,9 @@ public class TraceSegment {
     SpanId parentId = sd.getParentSpanId();
     if (parentId != null && parentId.isValid()) {
       this.parentId = convertToAmazonSpanID(parentId);
+      this.type = "subsegment";
+      // if subsegment, change name from a service name to a method name.
+      this.name = fixSegmentName(sd.getName());
     }
 
     // Time
@@ -220,7 +226,6 @@ public class TraceSegment {
   }
 
   private void makeCause(Status status) {
-    // TODO: description is not finished.
     if (status == null || status.isOk()) {
       return;
     }
@@ -228,7 +233,6 @@ public class TraceSegment {
     String desc = status.getDescription();
     if (desc != null && desc.equals("") != true) {
       Cause.Exceptions exp = new Cause.Exceptions();
-      Random rnd = new Random();
       exp.id =
           String.format("%04x", rnd.nextInt(0x10000)) + String.format("%04x", rnd.nextInt(0x10000));
       exp.message = desc;
