@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +50,9 @@ import java.util.regex.Pattern;
  *
  */
 public class TraceSegment {
+  private static final Logger logger = Logger.getLogger(TraceSegment.class.getName());
+
+  private static final Random rnd = new Random();
   private static final Integer MaxAge = 60 * 60 * 24 * 28; // 28Day
   private static final Integer MaxSkew = 60 * 5; // 5m
   private static final String VersionNo = "1";
@@ -112,6 +116,10 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Cause cause;
 
+  @JsonProperty("http")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public HTTP http;
+
   @JsonProperty("origin")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public String origin;
@@ -119,9 +127,6 @@ public class TraceSegment {
   @JsonProperty("subsegments")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<TraceSegment> subsegments;
-
-
-  private final static Random rnd = new Random();
 
   public static class Cause {
     @JsonProperty("exceptions")
@@ -141,6 +146,36 @@ public class TraceSegment {
     }
   }
 
+  public static class HTTP {
+    @JsonProperty("request")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public Request request;
+
+    public static class Request {
+      @JsonProperty("method")
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+      public String method;
+
+      @JsonProperty("url")
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+      public String url;
+
+      @JsonProperty("traced")
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+      public Boolean traced;
+    }
+
+    @JsonProperty("response")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public Response response;
+
+    public static class Response {
+      @JsonProperty("status")
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+      public String status;
+    }
+  }
+
   public TraceSegment(String name, SpanData sd) {
     SpanContext sc = sd.getContext();
     if (name == null || name.equals("")) {
@@ -153,11 +188,24 @@ public class TraceSegment {
     this.id = convertToAmazonSpanID(sc.getSpanId());
     this.traceId = convertToAmazonTraceID(sc.getTraceId());
     SpanId parentId = sd.getParentSpanId();
-    if (parentId != null && parentId.isValid()) {
-      this.parentId = convertToAmazonSpanID(parentId);
-      this.type = "subsegment";
-      // if subsegment, change name from a service name to a method name.
-      this.name = fixSegmentName(sd.getName());
+
+    if (sd.getHasRemoteParent() == null) { // top level
+      // set nothing
+    } else if (sd.getHasRemoteParent() == true) { // remote invocation
+      this.nameSpace = "remote";
+
+      // set http.traced = true even if not HTTP.
+      HTTP.Request req = new HTTP.Request();
+      req.traced = true;
+      this.http = new HTTP();
+      this.http.request = req;
+    } else if (parentId != null && parentId.isValid()) {
+      { // local invocation
+        this.type = "subsegment";
+        this.parentId = convertToAmazonSpanID(parentId);
+        // if subsegment, change name from a service name to a method name.
+        this.name = fixSegmentName(sd.getName());
+      }
     }
 
     // Time
@@ -167,10 +215,6 @@ public class TraceSegment {
       this.inProgress = true;
     } else {
       this.endTime = toEpochSeconds(endTime);
-    }
-
-    if (sd.getHasRemoteParent() != null) {
-      this.nameSpace = "remote";
     }
 
     makeCause(sd.getStatus());

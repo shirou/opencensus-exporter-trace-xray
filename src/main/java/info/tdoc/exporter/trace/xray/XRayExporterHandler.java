@@ -70,6 +70,7 @@ final class XRayExporterHandler extends SpanExporter.Handler {
         if (useDaemon == true) {
           s = "{\"format\": \"json\", \"version\": 1}\n" + s;
         }
+        logger.log(Level.FINE, s);
         encodedSpans.add(s);
       }
       try {
