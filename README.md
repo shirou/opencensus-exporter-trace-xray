@@ -2,6 +2,10 @@
 
 The *OpenCensus X-Ray Trace Exporter* is a trace exporter that exports data to AWS X-Ray.
 
+
+![Screenshot](x-ray-screenshot.png?raw=true "Screenshot")
+
+
 ### Hello X-Ray
 
 #### Add the dependencies to your project
