@@ -199,12 +199,6 @@ public class TraceSegment {
       this.nameSpace = "remote";
       this.precursorIds = new ArrayList<String>();
       this.precursorIds.add(convertToAmazonSpanID(parentId));
-
-      // set http.traced = true even if not HTTP.
-      HTTP.Request req = new HTTP.Request();
-      req.traced = true;
-      this.http = new HTTP();
-      this.http.request = req;
     } else if (parentId != null && parentId.isValid()) {
       { // local invocation
         this.type = "subsegment";
