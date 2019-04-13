@@ -18,7 +18,7 @@ buildscript {
         maven { url 'https://raw.githubusercontent.com/shirou/opencensus-exporter-trace-xray/master/public' }
     }
     dependencies {
-        classpath("info.tdoc:opencensus-exporter-trace-xray:0.0.1")
+        classpath("info.tdoc:opencensus-exporter-trace-xray:0.0.2")
     }
 }
 
@@ -31,7 +31,7 @@ dependencies {
     compile 'io.opencensus:opencensus-api:0.19.2'
     compile 'io.opencensus:opencensus-impl:0.19.2'
 
-    compile 'io.opencensus:opencensus-exporter-trace-xray:0.0.1'
+    compile 'io.opencensus:opencensus-exporter-trace-xray:0.0.2'
 }
 ```
 

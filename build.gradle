@@ -32,7 +32,7 @@ uploadArchives {
     repositories {
         mavenDeployer {
             repository(url: 'file:public')
-            pom.version = '0.0.1'
+            pom.version = '0.0.2'
             pom.groupId = 'info.tdoc'
             pom.artifactId = 'opencensus-exporter-trace-xray'
         }
