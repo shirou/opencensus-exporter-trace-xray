@@ -112,6 +112,10 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Map<String, Object> annotations;
 
+  @JsonProperty("precursor_ids")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public List<String> precursorIds;
+
   @JsonProperty("cause")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Cause cause;
@@ -193,6 +197,8 @@ public class TraceSegment {
       // set nothing
     } else if (sd.getHasRemoteParent() == true) { // remote invocation
       this.nameSpace = "remote";
+      this.precursorIds = new ArrayList<String>();
+      this.precursorIds.add(convertToAmazonSpanID(parentId));
 
       // set http.traced = true even if not HTTP.
       HTTP.Request req = new HTTP.Request();
