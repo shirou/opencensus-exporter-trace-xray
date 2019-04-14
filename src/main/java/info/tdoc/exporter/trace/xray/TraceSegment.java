@@ -30,6 +30,7 @@ import io.opencensus.trace.Status;
 import io.opencensus.trace.TraceId;
 import io.opencensus.trace.export.SpanData;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,10 +49,11 @@ import java.util.regex.Pattern;
  * document: https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
  *
  *
- *
  */
 public class TraceSegment {
   private static final Logger logger = Logger.getLogger(TraceSegment.class.getName());
+  private static final String ATTRIB_SQL_EXEC = "sql.query";
+  private static final SecureRandom Random = new SecureRandom();
 
   private static final Random rnd = new Random();
   private static final Integer MaxAge = 60 * 60 * 24 * 28; // 28Day
@@ -124,6 +127,10 @@ public class TraceSegment {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public HTTP http;
 
+  @JsonProperty("sql")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public SQL sql;
+
   @JsonProperty("origin")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public String origin;
@@ -178,6 +185,18 @@ public class TraceSegment {
       @JsonInclude(JsonInclude.Include.NON_NULL)
       public String status;
     }
+  }
+
+  public static class SQL {
+    @JsonProperty("sanitized_query")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public String sanitizedQuery;
+  }
+
+  public TraceSegment(String name, String parentId) {
+    this.name = name;
+    this.type = "subsegment";
+    this.parentId = parentId;
   }
 
   public TraceSegment(String name, SpanData sd) {
@@ -299,8 +318,30 @@ public class TraceSegment {
       return ret;
     }
 
+    SQL sqlinfo = null;
     for (Map.Entry<String, AttributeValue> label : attrib.getAttributeMap().entrySet()) {
+      String key = label.getKey();
+      logger.log(Level.WARNING, key);
+
+      if (key.equals(ATTRIB_SQL_EXEC)) {
+        sqlinfo = new SQL();
+        sqlinfo.sanitizedQuery = attributeValueToString(label.getValue());
+        continue;
+      }
+
       ret.put(label.getKey(), attributeValueToObject(label.getValue()));
+    }
+
+    if (sqlinfo != null) {
+      this.subsegments = new ArrayList<TraceSegment>();
+      TraceSegment s = new TraceSegment("sql.query", this.id);
+      s.id = generateId();
+      s.nameSpace = "remote";
+      s.startTime = this.startTime;
+      s.endTime = this.endTime;
+      s.traceId = this.traceId;
+      s.sql = sqlinfo;
+      this.subsegments.add(s);
     }
 
     return ret;
@@ -328,6 +369,25 @@ public class TraceSegment {
 
   private static double toEpochSeconds(Timestamp timestamp) {
     return timestamp.getSeconds() + NANOSECONDS.toMillis(timestamp.getNanos()) / 1000.0;
+  }
+
+  public static String generateId() {
+    String id = Long.toString(Random.nextLong() >>> 1, 16);
+    while (id.length() < 16) {
+      id = '0' + id;
+    }
+    return id;
+  }
+
+  private static final Function<Object, String> returnToString = Functions.returnToString();
+
+  private static String attributeValueToString(AttributeValue attributeValue) {
+    return attributeValue.match(
+        returnToString,
+        returnToString,
+        returnToString,
+        returnToString,
+        Functions.<String>returnConstant(""));
   }
 
   private static Object attributeValueToObject(AttributeValue attributeValue) {

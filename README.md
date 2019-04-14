@@ -50,6 +50,16 @@ public class MyMainClass {
 }
 ```
 
+#### SQL
+
+Is you add attribute with key `sql.query`, this library automatically create subsegment which has SQL sanitized_query attribute. Then, you can get SQL query with AWS X-Ray web console.
+
+Note: this name is sanitized_query but actually, not sanitized. plese be very careful because anyone who can access to X-Ray web console can read the SQL query.
+
+```
+    tracer.getCurrentSpan().putAttribute("sql.query", AttributeValue.stringAttributeValue(sql));
+```
+
 #### Java Versions
 
 Java 8 or above is required for using this exporter.
@@ -63,9 +73,10 @@ Src opensensus span data to X-Ray data.
 
 ## TODO
 
-- [ ] Report errors / exceptions
+- [x] Report errors / exceptions
 - [ ] Support http
-- [ ] Subsegments
+- [x] Support SQL
+- [x] Subsegments
 - [ ] Service (version etc)
 
 
