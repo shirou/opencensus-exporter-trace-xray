@@ -50,9 +50,23 @@ public class MyMainClass {
 }
 ```
 
-#### SQL
+#### HTTP Attribute key
 
-Is you add attribute with key `sql.query`, this library automatically create subsegment which has SQL sanitized_query attribute. Then, you can get SQL query with AWS X-Ray web console.
+If span has these attribute key and value, this library add AWS X-Ray HTTP Request/Response to generated segment.
+
+- http.method
+- http.user_agent
+- http.url
+- http.status_code
+
+These are same as this. But some of them can not be converted to AWS X-Ray HTTP Specification. so just dropped.
+
+https://github.com/census-instrumentation/opencensus-java/blob/master/contrib/http_util/src/main/java/io/opencensus/contrib/http/util/HttpTraceAttributeConstants.java
+
+
+#### SQL Attribute key
+
+If span has an attribute with key `sql.query`, this library automatically create subsegment which has SQL sanitized_query attribute. Then, you can get SQL query with AWS X-Ray web console.
 
 Note: this name is sanitized_query but actually, not sanitized. plese be very careful because anyone who can access to X-Ray web console can read the SQL query.
 
@@ -74,7 +88,7 @@ Src opensensus span data to X-Ray data.
 ## TODO
 
 - [x] Report errors / exceptions
-- [ ] Support http
+- [x] Support http
 - [x] Support SQL
 - [x] Subsegments
 - [ ] Service (version etc)

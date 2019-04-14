@@ -38,8 +38,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,10 +50,17 @@ import java.util.regex.Pattern;
  */
 public class TraceSegment {
   private static final Logger logger = Logger.getLogger(TraceSegment.class.getName());
-  private static final String ATTRIB_SQL_EXEC = "sql.query";
-  private static final SecureRandom Random = new SecureRandom();
+  public static final String ATTRIB_SQL_EXEC = "sql.query";
+  // https://github.com/census-instrumentation/opencensus-java/blob/master/contrib/http_util/src/main/java/io/opencensus/contrib/http/util/HttpTraceAttributeConstants.java
+  public static final String HTTP_HOST = "http.host";
+  public static final String HTTP_ROUTE = "http.route";
+  public static final String HTTP_PATH = "http.path";
+  public static final String HTTP_METHOD = "http.method";
+  public static final String HTTP_USER_AGENT = "http.user_agent";
+  public static final String HTTP_URL = "http.url";
+  public static final String HTTP_STATUS_CODE = "http.status_code";
 
-  private static final Random rnd = new Random();
+  private static final SecureRandom rnd = new SecureRandom();
   private static final Integer MaxAge = 60 * 60 * 24 * 28; // 28Day
   private static final Integer MaxSkew = 60 * 5; // 5m
   private static final String VersionNo = "1";
@@ -171,9 +176,9 @@ public class TraceSegment {
       @JsonInclude(JsonInclude.Include.NON_NULL)
       public String url;
 
-      @JsonProperty("traced")
+      @JsonProperty("user_agent")
       @JsonInclude(JsonInclude.Include.NON_NULL)
-      public Boolean traced;
+      public String user_agent;
     }
 
     @JsonProperty("response")
@@ -237,6 +242,8 @@ public class TraceSegment {
     }
 
     makeCause(sd.getStatus());
+    makeSQL(sd.getAttributes());
+    makeHTTP(sd.getAttributes(), sd.getStatus());
     this.annotations = this.makeAnnotations(sd.getName(), sd.getAttributes());
   }
 
@@ -310,31 +317,18 @@ public class TraceSegment {
     }
   }
 
-  private Map<String, Object> makeAnnotations(String name, SpanData.Attributes attrib) {
-    Map<String, Object> ret = new HashMap<String, Object>();
-    ret.put("name", name); // allways put span's name to attribute.
-
-    if (attrib.getAttributeMap().entrySet().size() == 0) {
-      return ret;
-    }
-
+  private void makeSQL(SpanData.Attributes attrib) {
     SQL sqlinfo = null;
     for (Map.Entry<String, AttributeValue> label : attrib.getAttributeMap().entrySet()) {
       String key = label.getKey();
-      logger.log(Level.WARNING, key);
-
       if (key.equals(ATTRIB_SQL_EXEC)) {
         sqlinfo = new SQL();
         sqlinfo.sanitizedQuery = attributeValueToString(label.getValue());
-        continue;
       }
-
-      ret.put(label.getKey(), attributeValueToObject(label.getValue()));
     }
-
     if (sqlinfo != null) {
       this.subsegments = new ArrayList<TraceSegment>();
-      TraceSegment s = new TraceSegment("sql.query", this.id);
+      TraceSegment s = new TraceSegment(ATTRIB_SQL_EXEC, this.id);
       s.id = generateId();
       s.nameSpace = "remote";
       s.startTime = this.startTime;
@@ -343,8 +337,112 @@ public class TraceSegment {
       s.sql = sqlinfo;
       this.subsegments.add(s);
     }
+  }
 
+  private void makeHTTP(SpanData.Attributes attrib, Status status) {
+    HTTP httpinfo = null;
+    for (Map.Entry<String, AttributeValue> label : attrib.getAttributeMap().entrySet()) {
+      switch (label.getKey()) {
+        case HTTP_METHOD:
+          if (httpinfo == null) {
+            httpinfo = new HTTP();
+            httpinfo.request = new HTTP.Request();
+            httpinfo.response = new HTTP.Response();
+          }
+          http.request.method = attributeValueToString(label.getValue());
+          break;
+        case HTTP_URL:
+          if (httpinfo == null) {
+            httpinfo = new HTTP();
+            httpinfo.request = new HTTP.Request();
+            httpinfo.response = new HTTP.Response();
+          }
+          http.request.url = attributeValueToString(label.getValue());
+          break;
+        case HTTP_USER_AGENT:
+          if (httpinfo == null) {
+            httpinfo = new HTTP();
+            httpinfo.request = new HTTP.Request();
+            httpinfo.response = new HTTP.Response();
+          }
+          http.request.user_agent = attributeValueToString(label.getValue());
+          break;
+        case HTTP_STATUS_CODE:
+          if (httpinfo == null) {
+            httpinfo = new HTTP();
+            httpinfo.request = new HTTP.Request();
+            httpinfo.response = new HTTP.Response();
+          }
+          httpinfo.response.status = attributeValueToString(label.getValue());
+      }
+      if (httpinfo == null) {
+        return;
+      }
+
+      if (httpinfo.response.status == null || httpinfo.response.status.equals((""))) {
+        // This is a fallback.
+        httpinfo.response.status = convertToHTTPStatusCode(status);
+      }
+
+      this.http = httpinfo;
+    }
+  }
+
+  private Map<String, Object> makeAnnotations(String name, SpanData.Attributes attrib) {
+    Map<String, Object> ret = new HashMap<String, Object>();
+    ret.put("name", name); // allways put span's name to attribute.
+
+    if (attrib.getAttributeMap().entrySet().size() == 0) {
+      return ret;
+    }
+    for (Map.Entry<String, AttributeValue> label : attrib.getAttributeMap().entrySet()) {
+      ret.put(label.getKey(), attributeValueToObject(label.getValue()));
+    }
     return ret;
+  }
+
+  /**
+   * convert OpenCensus status code to HTTP Status code
+   * https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
+   */
+  private static String convertToHTTPStatusCode(Status status) {
+    switch (status.getCanonicalCode()) {
+      case OK:
+        return "200"; // OK
+      case CANCELLED:
+        return "499"; // Client Closed Request
+      case UNKNOWN:
+        return "500"; // Internal Server Error
+      case INVALID_ARGUMENT:
+        return "400"; // Bad Request
+      case DEADLINE_EXCEEDED:
+        return "504"; // Gateway Timeout
+      case NOT_FOUND:
+        return "404"; // Not Found
+      case ALREADY_EXISTS:
+        return "409"; // Conflict
+      case PERMISSION_DENIED:
+        return "403"; // Forbidden
+      case UNAUTHENTICATED:
+        return "401"; // Unauthorized
+      case RESOURCE_EXHAUSTED:
+        return "429"; // Too Many Requests
+      case FAILED_PRECONDITION:
+        return "400"; // Bad Request;
+      case ABORTED:
+        return "409"; // Conflict
+      case OUT_OF_RANGE:
+        return "400"; // Bad Request
+      case UNIMPLEMENTED:
+        return "501"; // Not Implemented;
+      case INTERNAL:
+        return "500"; // Internal Server Error
+      case UNAVAILABLE:
+        return "503"; // Service Unavailable
+      case DATA_LOSS:
+        return "500"; // Internal Server Error
+    }
+    return "";
   }
 
   /*
@@ -372,7 +470,7 @@ public class TraceSegment {
   }
 
   public static String generateId() {
-    String id = Long.toString(Random.nextLong() >>> 1, 16);
+    String id = Long.toString(rnd.nextLong() >>> 1, 16);
     while (id.length() < 16) {
       id = '0' + id;
     }
