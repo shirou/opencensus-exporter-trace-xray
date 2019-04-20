@@ -40,18 +40,19 @@ final class XRayExporterHandler extends SpanExporter.Handler {
   private static final Sampler probabilitySampler = Samplers.probabilitySampler(0.0001);
   private static final Logger logger = Logger.getLogger(XRayExporterHandler.class.getName());
 
-  private static final String STATUS_CODE = "census.status_code";
-  private static final String STATUS_DESCRIPTION = "census.status_description";
-
   private final AWSXRay client;
   private final String serviceName;
   private final Boolean useDaemon;
   private final ObjectMapper mapper = new ObjectMapper();
 
   XRayExporterHandler(AWSXRay client, String serviceName) {
+    this(client, serviceName, false);
+  }
+
+  XRayExporterHandler(AWSXRay client, String serviceName, Boolean useDaemon) {
     this.client = client;
     this.serviceName = serviceName;
-    this.useDaemon = false;
+    this.useDaemon = useDaemon;
   }
 
   private TraceSegment generateSegment(String name, SpanData spanData) {
@@ -90,11 +91,11 @@ final class XRayExporterHandler extends SpanExporter.Handler {
             .setStatus(
                 Status.UNKNOWN.withDescription(
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
-        throw new RuntimeException(e); // TODO: should we instead do drop metrics?
+        throw new RuntimeException(e);
       }
     } catch (JsonProcessingException e) {
       tracer.getCurrentSpan().setStatus(Status.UNKNOWN.withDescription(e.getMessage()));
-      throw new RuntimeException(e); // TODO: should we instead do drop metrics?
+      throw new RuntimeException(e);
     } finally {
       scope.close();
     }

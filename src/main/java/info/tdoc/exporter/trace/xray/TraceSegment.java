@@ -199,6 +199,9 @@ public class TraceSegment {
     public String sanitizedQuery;
   }
 
+  /*
+   *  This constructor is used to create nested Segment. Do not use directory.
+   */
   public TraceSegment(String name, String parentId) {
     this.name = name;
     this.type = "subsegment";
