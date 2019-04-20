@@ -18,7 +18,7 @@ buildscript {
         maven { url 'https://raw.githubusercontent.com/shirou/opencensus-exporter-trace-xray/master/public' }
     }
     dependencies {
-        classpath("info.tdoc:opencensus-exporter-trace-xray:0.0.2")
+        classpath("info.tdoc:opencensus-exporter-trace-xray:0.0.3")
     }
 }
 
@@ -31,7 +31,7 @@ dependencies {
     compile 'io.opencensus:opencensus-api:0.19.2'
     compile 'io.opencensus:opencensus-impl:0.19.2'
 
-    compile 'io.opencensus:opencensus-exporter-trace-xray:0.0.2'
+    compile 'io.opencensus:opencensus-exporter-trace-xray:0.0.3'
 }
 ```
 
@@ -78,6 +78,13 @@ Note: this name is sanitized_query but actually, not sanitized. plese be very ca
 
 Java 8 or above is required for using this exporter.
 
+## Note
+
+This exporter round down one AWS X-Ray TraceID time part per one minutes in order to create traceable AWS X-Ray TraceID from OpenCensus TraceID among distirbuited nodes. If does not round down, X-Ray TraceIDs are different so X-Ray can not trace requests.
+
+Round down to minutes, a trace will be separeted multiple trace if the requests continues over 59-00 sec. And X-Ray console uses the time part in X-Ray TraceID to show, a trace will not be displayed 1 minutes.
+This exporter does not chang estart time, so users can know exactily when the trace happend.
+
 ## conversion
 
 Src opensensus span data to X-Ray data.
@@ -91,7 +98,6 @@ Src opensensus span data to X-Ray data.
 - [x] Support http
 - [x] Support SQL
 - [x] Subsegments
-- [ ] Service (version etc)
 
 
 ## reference
