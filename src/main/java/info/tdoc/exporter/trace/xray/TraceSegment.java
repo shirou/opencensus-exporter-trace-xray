@@ -39,7 +39,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -221,14 +220,14 @@ public class TraceSegment {
 
     if (sd.getHasRemoteParent() == null) { // top level
       // set nothing
-    } else if (sd.getHasRemoteParent() == true) { // remote invocation
-      this.nameSpace = "remote";
+    } else {
+      this.parentId = convertToAmazonSpanID(parentId);
       this.precursorIds = new ArrayList<String>();
       this.precursorIds.add(convertToAmazonSpanID(parentId));
-    } else if (parentId != null && parentId.isValid()) {
-      { // local invocation
+      if (sd.getHasRemoteParent() == true) { // remote invocation
+        this.nameSpace = "remote";
+      } else if (parentId != null && parentId.isValid()) { // local invocation
         this.type = "subsegment";
-        this.parentId = convertToAmazonSpanID(parentId);
         // if subsegment, change name from a service name to a method name.
         this.name = fixSegmentName(sd.getName());
       }
@@ -268,7 +267,7 @@ public class TraceSegment {
   /**
    * return Trace ID time part.
    *
-   * To get same Trace ID among servers, round down current time to minutes.
+   * <p>To get same Trace ID among servers, round down current time to minutes.
    */
   private static long getAmazonTraceIDTime() {
     return Instant.now(Clock.systemUTC()).truncatedTo(ChronoUnit.MINUTES).getEpochSecond();
