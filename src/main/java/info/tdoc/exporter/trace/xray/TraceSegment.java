@@ -33,11 +33,13 @@ import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -263,12 +265,21 @@ public class TraceSegment {
     return sb.toString();
   }
 
+  /**
+   * return Trace ID time part.
+   *
+   * To get same Trace ID among servers, round down current time to minutes.
+   */
+  private static long getAmazonTraceIDTime() {
+    return Instant.now(Clock.systemUTC()).truncatedTo(ChronoUnit.MINUTES).getEpochSecond();
+  }
+
   /*
    * converts a trace ID to the Amazon format.
    *
    */
   private static String convertToAmazonTraceID(TraceId traceId) {
-    long epochNow = Instant.now(Clock.systemUTC()).getEpochSecond();
+    long epochNow = getAmazonTraceIDTime();
     long epoch = ByteBuffer.wrap(Arrays.copyOfRange(traceId.getBytes(), 0, 4)).getInt();
 
     long delta = epochNow - epoch;
